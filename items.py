@@ -50,6 +50,8 @@ class HkOddsItem(scrapy.Item):
     SireName = scrapy.Field()
     DamName = scrapy.Field()
     ImportType = scrapy.Field()
+    file_urls = scrapy.Field()
+    files = scrapy.Field()
     #odds data 
     # Updatetime = scrapy.Field()
     # UpdateDate = scrapy.Field()

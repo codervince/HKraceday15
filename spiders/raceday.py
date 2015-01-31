@@ -10,8 +10,9 @@ from scrapy.http import Request
 from scrapy.contrib.loader.processor import TakeFirst
 from scrapy.contrib.linkextractors import LinkExtractor
 from datetime import time
+import logging
 # from ..textxml import *
-
+from scrapy.log import ScrapyFileLogObserver
 pp = pprint.PrettyPrinter(indent=4)
 #get racecard to get data
 #get XML from odds site match racenumbers? 
@@ -29,31 +30,53 @@ def tf(values, encoding="utf-8"):
 
 #USAGE: 
 # cd /Users/vmac/Documents/PROGRAMMING/PY/scrapy/HKOdds/hkodds
-
-class OddsSpider(CrawlSpider):
+# scrapy crawl raceday -a date=20150201 -a coursecode='ST'
+# or latest event scrapy crawl raceday
+class OddsSpider(scrapy.Spider):
     name = "raceday"
-    allowed_domains = ["racing.hkjc.com"]
+    allowed_domains = ["hkjc.com"]
+    # 20150201 %Y%m%d
+    # start_url = "http://racing.hkjc.com/racing/Info/meeting/Results/english/Local/%s/%s/1"
+    start_url = "http://racing.hkjc.com/racing/Info/Meeting/RaceCard/English/Local/%s/%s/1"
 
-    # problem switches to CN and security error
-    # http://bet.hkjc.com/default.aspx?url=/racing/pages/odds_wp.aspx?date=21-01-2015&venue=HV&raceno=2&lang=en
-    # http://bet.hkjc.com/default.aspx?url=/racing/pages/odds_wp.aspx?date=21-01-2015&venue=HV&raceno=4&lang=en
-    start_urls = [
-        # "http://bet.hkjc.com/default.aspx?url=/racing/pages/odds_wp.aspx?date=21-01-2015&venue=HV&raceno=1&lang=en"
-        # "http://bet.hkjc.com/default.aspx?url=/racing/pages/odds_wp.aspx&lang=en&dv=local"
-        # "http://bet.hkjc.com/racing/pages/odds_wp.aspx?lang=en&dv=local"
-        "http://racing.hkjc.com/racing/Info/meeting/RaceCard/english/Local/"
-    ]
+    def __init__(self, date=None, coursecode=None):
+        if date is None or coursecode is None:
+            self.historical = False
+            # start_url = "http://racing.hkjc.com/racing/Info/meeting/RaceCard/english/Local/"
+            # raise ValueError("Invalid spider parameters")
+        else:
+            self.racedate = date
+            self.racecode = coursecode
+            self.historical = True
+        logfile = open('testlog.log', 'w')
+        log_observer = ScrapyFileLogObserver(logfile, level=logging.DEBUG)
+        log_observer.start()
 
-    rules = (
+        # rules = (
     
-    Rule(LinkExtractor(allow=('/racing/Info/Meeting/RaceCard/English/Local/.*', ), deny=('subsection\.php',)), \
-        callback='parse_raceday', follow=True),
-
-    # Rule(LinkExtractor(allow=('http://www.hkjc.com/english/racing/display_sectionaltime.asp?.*', ), \
-    #     deny=('racing/Info/Meeting/Results/English/Local/.*',)), callback='parse_sectionals', follow=True),
+        # Rule(LinkExtractor(allow=('/racing/Info/Meeting/RaceCard/English/Local/.*', ), deny=('subsection\.php',)), \
+        #     callback='parse', follow=True),
     
 
-    )
+        # )
+
+# class OddsSpider(CrawlSpider):
+#     name = "raceday"
+#     allowed_domains = ["racing.hkjc.com"]
+
+
+
+#     start_urls = [
+#         "http://racing.hkjc.com/racing/Info/meeting/RaceCard/english/Local/"
+#     ]
+
+#     rules = (
+    
+#     Rule(LinkExtractor(allow=('/racing/Info/Meeting/RaceCard/English/Local/.*', ), deny=('subsection\.php',)), \
+#         callback='parse_raceday', follow=True),
+    
+
+#     )
 
 
     # QP QN http://bet.hkjc.com/default.aspx?url=/racing/pages/odds_wp.aspx&lang=en&dv=local
@@ -65,11 +88,17 @@ class OddsSpider(CrawlSpider):
     #ADAPT FOR HistoricalRaceday
     '''
     TODO: adapt to historical raceday
-
-
+    URL http://racing.hkjc.com/racing/Info/Meeting/RaceCard/English/Local/20150101/ST/1
+    date coursecode
     '''
 
-    def parse_raceday(self, response):
+    def start_requests(self):
+        if self.historical:
+            return [Request(self.start_url % (self.racedate, self.racecode))]
+        return [Request("http://racing.hkjc.com/racing/Info/meeting/RaceCard/english/Local/")]
+        
+
+    def parse(self, response):
         # filename = response.url.split("/")[-2]
         # with open(filename, 'wb') as f:
         #     f.write(response.body)
@@ -107,7 +136,7 @@ class OddsSpider(CrawlSpider):
             racedatetime = datetime.combine(racedateobj, localjumptime)
             racedatetime.replace(year=datetime.today().year)
             #correct format?
-            racedatetime = racedatetime.strftime("%Y%m%d%H:%M")
+            # racedatetime = racedatetime.strftime("%Y%m%d%H:%M")
             racedate = racedatetime.date()
             surface = re.sub(r'([^\s\w:]|_)+', '',r2[3]).strip().split(u" ")[0].upper()
             #format A B C D+2 etc..
@@ -122,6 +151,16 @@ class OddsSpider(CrawlSpider):
                 raceclass = None    
             # if no racebook url -> http://www.hkjc.com/english/racing/No_PDF_Download_all.html
             #response.xpath("//img[@alt='Download Race Form (All Races)']").extract() selenium
+
+            #d/l to store as image URL
+            #harcode http://racing.hkjc.com/racing/content/PDF/RaceCard/20150101_starter_all.pdf
+            #replace _r1 re match r' _r\d
+            # http://racing.hkjc.com/racing/content/PDF/RaceCard/20130101_starter_all.pdf GET ALL
+            #construct racebookurl from date
+            file_urls=  ["http://racing.hkjc.com/racing/content/PDF/RaceCard/" + racedate.strftime("%Y%m%d") + "_starter_all.pdf"]
+
+            # racebook_race = response.xpath("//img[contains(@src,\"/racing/Info/StaticFile/English/images/print_btn_all.gif\")]/preceding::a[1]/@href").extract()[0]
+
             meta = dict(
                 Racecoursecode = racecoursecode,
                 Racenumber = racenumber,
@@ -133,7 +172,8 @@ class OddsSpider(CrawlSpider):
                 Raceratingspan = raceratingspan,
                 Raceclass = raceclass,
                 Racedate = racedate,
-                Racedatetime = racedatetime
+                Racedatetime = racedatetime,
+                file_urls = file_urls 
                 )
             #THE TABLE
             #eachhorse is response.xpath("//table[@class=\"draggable hiddenable\"]/tr[contains(@class, 'font13 tdAlignC')]")[i].extract()
@@ -161,7 +201,7 @@ class OddsSpider(CrawlSpider):
                 item['HorseNumber'] = r.xpath("td[1]/text()").extract()[0].strip()
                 item['Last6runs'] = r.xpath("td[2]/text()").extract()[0].strip()
                 #HorseColors here
-                item['image_urls'] = r.xpath("td[3]/img/@src").extract()[0].strip()
+                item['image_urls'] = [r.xpath("td[3]/img/@src").extract()[0].strip(),]
                 item['Horsename'] = r.xpath("td[4]/a/text()").extract()[0].strip()
                 item['Horsecode'] = r.xpath("td[5]/text()").extract()[0].strip()
                 item['ActualWt'] = r.xpath("td[6]/text()").extract()[0].strip()
@@ -200,6 +240,7 @@ class OddsSpider(CrawlSpider):
                 item['Prizemoney'] = meta['Prizemoney']
                 item['Raceratingspan'] = meta['Raceratingspan']
                 item['Raceclass'] = meta['Raceclass']
+                item['file_urls'] = meta['file_urls']
                 runner_items.append(item)
 
             return runner_items 
@@ -340,6 +381,3 @@ class OddsSpider(CrawlSpider):
         except Exception, e:
             log.msg("Skipping meeting because of error: %s" % (str(e)))
 
-    # def start_requests(self):
-    #     for horse in self.horses:
-    #         yield Request(self.horse_url % horse, meta=dict(code=horse))

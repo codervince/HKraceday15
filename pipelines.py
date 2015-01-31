@@ -7,6 +7,7 @@
 import scrapy
 from collections import defaultdict
 from scrapy.contrib.pipeline.images import ImagesPipeline
+from scrapy.contrib.pipeline.files import FilesPipeline
 from scrapy.exceptions import DropItem
 from sqlalchemy.orm import sessionmaker, exc, create_session
 from sqlalchemy import *
@@ -14,10 +15,57 @@ from hkodds.models import *
 from textxml import *
 
 
-class HkoddsPipeline(object):
-    def process_item(self, item, spider):
-        return item
 
+# class MyImagesPipeline(ImagesPipeline):
+   
+ 
+
+#     def file_path(self, request, response=None, info=None):
+#         #item=request.meta['item'] # Like this you can use all from item, not just url.
+#         #http://www.hkjc.com/english/racing/finishphoto.asp?racedate=20141220R1_L.jpg
+#         image_id = request.url.split('/')[-1]
+#         # image_id = request.meta.get('Inracename')
+#         #get name
+#         return 'full/%s' % (image_id)
+#     # def set_filename(self, response):
+#     #     # pp.pprint(response.meta)
+#     #     theurl = response.meta["RacecourseCode"][0] + response.meta["RaceDate"][0] + response.meta["RaceNumber"][0]
+#     #     #add a regex here to check the title is valid for a filename.
+#     #     return 'full/{0}.jpg'.format(theurl)   
+
+#     # def get_images(self, response, request, info):
+#     #     for key, image, buf in super(MyImagesPipeLine, self).get_images(response, request, info):
+#     #         key = self.set_filename(response)
+#     #     yield key, image, buf
+
+#     def get_media_requests(self, item, info):
+#         try:
+#             for image in item['image_urls']:
+#                 yield scrapy.Request(image)
+#         except:
+            # None
+
+
+class MyFilesPipeline(FilesPipeline):
+    def file_path(self, request, response=None, info=None):
+        #item=request.meta['item'] # Like this you can use all from item, not just url.
+        #http://www.hkjc.com/english/racing/finishphoto.asp?racedate=20141220R1_L.jpg
+        image_id = request.url.split('/')[-1]
+        # image_id = request.meta.get('Inracename')
+        #get name
+        return 'full/%s' % (image_id)
+
+
+
+class MyImagesPipeline(ImagesPipeline):
+    def file_path(self, request, response=None, info=None):
+        #item=request.meta['item'] # Like this you can use all from item, not just url.
+        image_id = request.url.split('/')[-1]
+        # print(request.meta["RaceDate"])
+        # hcode = request.meta['Horsecode']
+        # racedate = request.meta['RaceDate']
+        #get name
+        return 'full/%s' % (image_id)
 
 # class MyImagesPipeline(ImagesPipeline):
 
@@ -140,7 +188,7 @@ class SQLAlchemyPipeline(object):
 				    JockeyWtOver = item["JockeyWtOver"] if item["JockeyWtOver"] != u'' else None,
 				    Draw = item["Draw"],
 				    Rating = item["Rating"],
-				    RatingChangeL1 = int(item["RatingChangeL1"]),
+				    RatingChangeL1 = int(item["RatingChangeL1"]) if item["RatingChangeL1"] != u'-' else None,
 				    DeclarHorseWt = item["DeclarHorseWt"] if item["DeclarHorseWt"] != u'' else None,
 				    HorseWtDeclarChange = item["HorseWtDeclarChange"] if item["HorseWtDeclarChange"] != '-' else None,
                     HorseWtpc = float(item["ActualWt"])/float(item["DeclarHorseWt"]) if item["DeclarHorseWt"] else None,
